@@ -63,10 +63,20 @@ public class Participant {
     public boolean assignFirstPreference() {
         if (preferences.size()==0) return false;
         //@TODO allocated to "smart" time slot, maybe not full etc
-        for (int i=0; i<present.length; i++) {
-            if (present[i]) {
-                if (assignFirstPreference(i)) return true;
+        if ((new Random().nextBoolean())) {
+            for (int i=0; i<present.length; i++) {
+                if (present[i]) {
+                    if (assignFirstPreference(i)) return true;
+                }
             }
+        }
+        else {
+            for (int i=present.length-1; i>=0; i--) {
+                if (present[i]) {
+                    if (assignFirstPreference(i)) return true;
+                }
+            }
+
         }
         // remove hopelessly unassignable preference
         preferences.pop();
@@ -147,10 +157,24 @@ public class Participant {
         if (unalloc>13) unalloc=13;
 
         fitness = 0;
+        for (int i = 0; i < allocatedPreferences.length; i++) {
+            var pref = allocatedPreferences[i];
+            if (pref==null && present[i]) {
+                fitness += unalloc;
+                continue;
+            }
+            else if (pref!=null)
+                fitness+= pref.getOrder();
+
+        }
+
+
+    }
+
+    public boolean hasProgramWithId(int id) {
         for (var p : allocatedPreferences)
-            fitness += (p == null ? unalloc : p.order);
-
-
+            if (p!=null && p.getProgramId()==id) return true;
+        return false;
     }
 
     public String getId() {
@@ -197,6 +221,7 @@ public class Participant {
 
 
 
+
     public boolean isResolved() {
 
         // Hopeless == resolved
@@ -237,5 +262,18 @@ public class Participant {
 
     public List<Preference> getOriginalPreferences() {
         return originalPreferences;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Participant that = (Participant) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }

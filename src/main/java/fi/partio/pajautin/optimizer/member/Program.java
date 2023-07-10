@@ -4,6 +4,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Program {
 
@@ -42,7 +43,12 @@ public class Program {
 
     int[] slotPreference;
 
+    List<Participant> facilitators;
+
+
     HashMap<String, Participant>[] assignedParticipants;
+
+
 
     public Program(Map<Object, Object> JSONData) {
         this.name = JSONData.get("name") + "";
@@ -63,6 +69,7 @@ public class Program {
         combinations = calculateCombinations(maxOccurance, possibleTimeSlotCount);
         assignedParticipants = new HashMap[]{new HashMap<>(), new HashMap<>(), new HashMap<>()};
         slotPreference = new int[]{0, 0, 0};
+        facilitators = new ArrayList<>();
     }
 
 
@@ -96,6 +103,12 @@ public class Program {
             return;
         }
         allocatedTimeSlots[slot] = true;
+
+        // If facilitator is assigned to this program, remove him from other programs and set him as not present
+        for (Participant p : facilitators) {
+            p.unAssignSlot(slot);
+            p.getPresent()[slot] = false;
+        }
     }
 
     /**
@@ -287,4 +300,45 @@ public class Program {
     public void unAssignParticipant(Participant participant, int slot) {
         assignedParticipants[slot].remove(participant.getId());
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Program program = (Program) o;
+        return id == program.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    public int[] getSlotPreference() {
+        return slotPreference;
+    }
+
+    public List<List<String>> getAssignedParticipants() {
+        List<List<String>> result = new ArrayList<>();
+        for (int i=0; i<assignedParticipants.length; i++) {
+            List<String> slot = new ArrayList<>();
+            for (Participant p : assignedParticipants[i].values()) {
+                slot.add(p.getId());
+            }
+            result.add(slot);
+        }
+        return result;
+    }
+
+
+    public void addFacilitator(Participant facilitator) {
+        facilitators.add(facilitator);
+    }
+
+    public List<String> getFacilitators() {
+        return facilitators.stream().map(f -> f.getId()).collect(Collectors.toList());
+    }
+
+
+
 }

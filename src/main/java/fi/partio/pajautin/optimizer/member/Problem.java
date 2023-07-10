@@ -28,6 +28,19 @@ public class Problem {
             participants.add(participant);
             unprocessedParticipants.add(participant);
         }
+
+        // Add participants who are facilitators to the programs
+        for (List<Object> tuple : participantSpeakers) {
+            int programId = (Integer)tuple.get(0);
+            String participantId = (String)tuple.get(1);
+            Optional<Participant> first = participants.stream().filter(p -> p.getId().equals(participantId)).findFirst();
+            if (first.isPresent()) {
+                Participant participant = first.get();
+                Program program = programs.get(programId);
+                program.addFacilitator(participant);
+            }
+        }
+
     }
 
 

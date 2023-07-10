@@ -2,6 +2,7 @@ package fi.partio.pajautin.optimizer;
 
 import fi.partio.pajautin.optimizer.engine.EagerOptimizer;
 import fi.partio.pajautin.optimizer.engine.Optimizer;
+import fi.partio.pajautin.optimizer.engine.SanityChecker;
 import fi.partio.pajautin.optimizer.member.Problem;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.core.config.Configurator;
@@ -14,8 +15,6 @@ import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
 
 public class Main {
     public static void main(String[] args) {
-
-
 
 
         if (args[0].equals("optimize")) {
@@ -37,6 +36,16 @@ public class Main {
         Problem problem = new Problem(DataUtil.readJsonFileToList(args[1]),DataUtil.readJsonFileToMap(args[2]), DataUtil.readJsonFileToDoubleList(args[3]));
         Optimizer optimizer = new EagerOptimizer(problem);
         optimizer.optimize();
+
+        // Check sanity
+        if (SanityChecker.checkSanity(problem)) {
+            System.out.println("Sanity check passed");
+            ResultExporter.exportProblem(problem);
+        } else {
+            System.out.println("Sanity check failed");
+        }
+
+
     }
 
     private static void csv(String[] args) {

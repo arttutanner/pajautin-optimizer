@@ -79,7 +79,8 @@ public class EagerOptimizer extends Optimizer {
     private void tryToAllocateUnallocatedParticipants() {
         problem.getParticipants().stream().filter(p -> p.getAllocatedCount() < p.getPresentCount() && p.getOriginalPreferences().size() > 9).forEach(
                 participant -> {
-                    for (int i=0; i<participant.getPresentCount(); i++) {
+                    log.debug("Trying to allocate unallocated participant " + participant);
+                    for (int i=0; i<participant.getPresent().length; i++) {
                         if (participant.getPresent()[i] && participant.getAllocatedPreferences()[i] == null) {
                             tryToAllocateParticipantForSlot(participant, i);
                         }
@@ -107,7 +108,14 @@ public class EagerOptimizer extends Optimizer {
                             if (otherPreference.getProgram().getAssignedParticipants(slot).size() < otherPreference.getProgram().getMaxPlaces()) {
                                 int fitnessChangeForParticipant=13-preference.getOrder(); // assume that the participant has the worst possible fitness for this slot
                                 int fitnessChangeForOtherParticipant=otherParticipant.getAllocatedPreferences()[slot].getOrder()-otherPreference.getOrder();
-                                possibleSwaps.add(new PossibleSwap(otherParticipant, participant, otherPreference, preference, slot, fitnessChangeForOtherParticipant+fitnessChangeForParticipant));
+
+                                // Make sure that none of the participant already have the program that they are being swapped to
+                                if (otherParticipant.hasProgramWithId(otherPreference.getProgramId()) || participant.hasProgramWithId(preference.getProgramId())) {
+                                    log.debug("Swap is not possible because one of the participants already has the program that they are being swapped to");
+                                }
+                                else {
+                                    possibleSwaps.add(new PossibleSwap(otherParticipant, participant, otherPreference, preference, slot, fitnessChangeForOtherParticipant + fitnessChangeForParticipant));
+                                }
                             }
                         }
                 );
@@ -117,10 +125,12 @@ public class EagerOptimizer extends Optimizer {
         // Sort the swaps by fitness change
 
         possibleSwaps.sort((s1, s2) -> Integer.compare(s2.getFitnessChange(), s1.getFitnessChange()));
-        if (possibleSwaps.size()>0)
+        if (possibleSwaps.size()>0) {
+            log.debug("Executing swap"+possibleSwaps.get(0).toString()+" for participant "+participant+" for slot "+slot+" with fitness change "+possibleSwaps.get(0).getFitnessChange());
             executeSwap(possibleSwaps.get(0));
+        }
         else
-            log.info("No possible swaps for participant " + participant + " for slot " + slot);
+            log.warn("No possible swaps for participant " + participant + " for slot " + slot);
 
     }
 
@@ -143,6 +153,7 @@ public class EagerOptimizer extends Optimizer {
         for (Program p : problem.getPrograms()) {
             System.out.println(p);
         }
+
         AtomicInteger ct = new AtomicInteger();
         problem.getParticipants().stream().filter(p -> p.getAllocatedCount() < p.getPresentCount() && p.getOriginalPreferences().size() > 9).forEach(
                 p -> {
@@ -289,6 +300,9 @@ public class EagerOptimizer extends Optimizer {
         problem.pruneResolvedPrograms();
         log.info("Pruned " + pruned + " resolved programs");
     }
+
+
+
 
 
 }
