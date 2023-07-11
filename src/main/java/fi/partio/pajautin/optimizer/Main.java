@@ -18,7 +18,8 @@ public class Main {
 
 
         if (args[0].equals("optimize")) {
-            optimize(args);
+          // for (int i=0; i<100; i++)
+                optimize(args);
         } else if (args[0].equals("test-data")) {
             test(args);
         } else if (args[0].equals("csv")) {

@@ -1,7 +1,10 @@
 package fi.partio.pajautin.optimizer.member;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class Problem {
     public static final int UNALLOCATED_FITNESS = 30;
@@ -110,8 +113,17 @@ public class Problem {
         return stats;
     }
 
+    @JsonIgnore
+    public List<Participant> getUnallocated() {
+        return getParticipants().stream().filter(p -> p.getAllocatedCount() < p.getPresentCount() && p.getOriginalPreferences().size() > 9).collect(Collectors.toList());
+    }
 
-
+    public List<Program> getProgramsWithTooFewParticipants() {
+        return getPrograms().stream().filter(p -> (p.getAllocatedTimeSlots()[0] && p.getAssignedParticipants(0).size() < p.getMinPlaces())
+                || (p.getAllocatedTimeSlots()[1] && p.getAssignedParticipants(1).size() < p.getMinPlaces())
+                || (p.getAllocatedTimeSlots()[2] && p.getAssignedParticipants(2).size() < p.getMinPlaces()))
+                .collect(Collectors.toList());
+    }
 
     public void printStats() {
         LinkedHashMap stats = getStats();

@@ -35,7 +35,8 @@ public class SanityChecker {
         return noActiveMoreThanMaxOccurances(problem) &&
                 noTooMuchParticipants(problem) &&
                 noTooLittleParticipants(problem) &&
-                noDuplicateParticipants(problem) ;
+                noDuplicateParticipants(problem) &&
+                noFacilitatorAllocatedInProgramDuringOwnWorkshop(problem);
 
 
     }
@@ -135,7 +136,6 @@ public class SanityChecker {
     }
 
 
-
     private static boolean noProgramAllocationWithProgramNotActive(Problem problem) {
         for (Participant p : problem.getParticipants()) {
             for (int i = 0; i < p.getAllocatedPreferences().length; i++) {
@@ -207,6 +207,26 @@ public class SanityChecker {
         return true;
     }
 
+    public static boolean noFacilitatorAllocatedInProgramDuringOwnWorkshop(Problem problem) {
+        for (Program p : problem.getPrograms()) {
+            for (int i = 0; i < p.getAllocatedTimeSlots().length; i++) {
+                if (p.getAllocatedTimeSlots()[i]) {
+                    for (String facilitatorId : p.getFacilitators()) {
+                        Participant facilitator = problem.getParticipants().stream().filter(participant -> participant.getId().equals(facilitatorId)).findFirst().get();
+                        if (facilitator.getAllocatedPreferences()[i] != null) {
+                                log.error("Facilitator " + facilitatorId + " allocated to program " + facilitator.getAllocatedProgramIds().get(i) + " during own workshop");
+                                return false;
+                        }
+                        log.error("Workshop " + p.getId() + " has no speakers in timeslot " + i);
+                        return false;
+                    }
+                }
+            }
+        }
+        log.info("No facilitator allocated in program during their own workshop");
+        return true;
+    }
+
     public static Object getFirstDuplicateEntry(Collection<? extends Object> objCol) {
         List<Object> list;
         if (objCol instanceof List) list = (List) objCol;
@@ -225,5 +245,7 @@ public class SanityChecker {
         }
         return null;
     }
+
+
 
 }

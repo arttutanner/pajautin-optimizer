@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 public class EagerOptimizer extends Optimizer {
 
     static final boolean LEAST_POPULAR_FIRST = true;
+    static final int FORCE_MOVE_TRESHOLD = 5;
 
     private static final Logger log = LogManager.getLogger(EagerOptimizer.class);
 
@@ -72,7 +73,84 @@ public class EagerOptimizer extends Optimizer {
 
         tryToAllocateUnallocatedParticipants();
 
+        tryToFindPeopleForProgramsUnderMinimum();
+
         printStuff();
+
+    }
+
+    private void tryToFindPeopleForProgramsUnderMinimum() {
+        List<Program> programsWithTooFewParticipants = problem.getProgramsWithTooFewParticipants();
+        for (var program : programsWithTooFewParticipants) {
+                    if (program.getAllocatedTimeSlotCount()>1) {
+                        log.warn("Program " + program + " has too few participants, but is allocated to multiple time slots. Consider decreasing number of maximum slot for program.");
+                    }
+
+                    for (int i=0; i<program.getAllocatedTimeSlots().length; i++) {
+                        if (program.getAllocatedTimeSlots()[i] && program.getAssignedParticipants(i).size()<program.getMinPlaces()) {
+                            tryToFindPersonsForProgram(program, i);
+                        }
+                    }
+                }
+
+    }
+
+    private void tryToFindPersonsForProgram(Program program, int slot) {
+
+        // check how many people we need to make the program above minimum
+        int missing = program.getMinPlaces() - program.getAssignedParticipants(slot).size();
+        log.debug("Trying to find "+missing+" persons for program " + program + " for slot " + slot+ " to make it above minimum.");
+        if (missing > FORCE_MOVE_TRESHOLD) {
+            log.warn("Program "+program+" has too few participants, but the number of missing participants is too high to force move people. Consider decreasing number of minimum slot for program.");
+            return;
+        }
+        // Find all participants who
+        // -are not in the program already
+        // -have the program in their preferences
+        // -moving them to this program would not make their original program below minimum
+        List<PossibleSwap> swaps = problem.getParticipants().stream()
+                .filter(p ->
+                        !p.hasProgramWithId(program.getId()) &&
+                        p.getOriginalPreferences().stream().anyMatch(pref ->
+                                        pref.getProgramId() == program.getId()
+
+                                ) &&
+                        (p.getAllocatedPreferences()[slot]!=null &&
+                                p.getAllocatedPreferences()[slot].getProgram().getAssignedParticipants(slot).size()
+                                        >= p.getAllocatedPreferences()[slot].getProgram().getMinPlaces() + 1)
+                ).map(p ->
+                        new PossibleSwap(p, null,
+                                p.getAllocatedPreferences()[slot],
+                                p.getOriginalPreferences().stream().filter(pref -> pref.getProgramId() == program.getId()).findFirst().get(),
+                                slot, 0)
+                )
+                .collect(Collectors.toList());
+
+        // Calculate the fitness change for swaps
+        swaps.forEach(swap -> {
+            swap.setFitnessChange(swap.getFromPreference().getOrder()-swap.getToPreference().getOrder());
+        });
+
+        swaps.sort((s1, s2) -> s2.getFitnessChange() - s1.getFitnessChange());
+
+        if (swaps.size()<missing) {
+            log.warn("Program "+program+" has too few participants, but there are not enough people to move to it. Consider decreasing number of minimum slot for program.");
+            return;
+        }
+        for (int i=0; i<missing; i++) {
+            PossibleSwap swap = swaps.get(i);
+            log.debug("Trying to move participant " + swap.getFromParticipant() + " to program " + program + " for slot " + slot);
+            executeLocalSwap(swap);
+        }
+
+
+    }
+
+    private void executeLocalSwap(PossibleSwap swap) {
+
+        swap.getFromParticipant().getAllocatedPreferences()[swap.getSlot()] = swap.getToPreference();
+        swap.getToPreference().getProgram().getAssignedParticipants(swap.getSlot()).put(swap.getFromParticipant().getId(), swap.getFromParticipant());
+        swap.getFromPreference().getProgram().getAssignedParticipants(swap.getSlot()).remove(swap.getFromParticipant().getId());
 
     }
 
@@ -163,12 +241,7 @@ public class EagerOptimizer extends Optimizer {
         System.out.println("Unallocated: " + ct);
 
         System.out.println("PROGRAMS WITH LESS THAN MINIMUM PARTICIPANTS");
-        problem.getPrograms().stream().filter(p -> (p.getAllocatedTimeSlots()[0] && p.getAssignedParticipants(0).size() < p.getMinPlaces())
-                || (p.getAllocatedTimeSlots()[1] && p.getAssignedParticipants(1).size() < p.getMinPlaces())
-                || (p.getAllocatedTimeSlots()[2] && p.getAssignedParticipants(2).size() < p.getMinPlaces())).forEach(
-                p -> {
-                    System.out.println(p);
-                });
+        problem.getProgramsWithTooFewParticipants().stream().forEach(p -> System.out.println(p));
 
         problem.printStats();
     }

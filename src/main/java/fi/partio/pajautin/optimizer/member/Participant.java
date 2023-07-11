@@ -1,9 +1,11 @@
 package fi.partio.pajautin.optimizer.member;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 public class Participant {
@@ -63,6 +65,7 @@ public class Participant {
     public boolean assignFirstPreference() {
         if (preferences.size()==0) return false;
         //@TODO allocated to "smart" time slot, maybe not full etc
+        /*
         if ((new Random().nextBoolean())) {
             for (int i=0; i<present.length; i++) {
                 if (present[i]) {
@@ -78,6 +81,11 @@ public class Participant {
             }
 
         }
+
+         */
+        
+        if (assingMultiplePreferencesSmartly()) return true;
+
         // remove hopelessly unassignable preference
         preferences.pop();
         return false;
@@ -181,12 +189,23 @@ public class Participant {
         return id;
     }
 
+    @JsonIgnore
     public Stack<Preference> getPreferences() {
         return preferences;
     }
 
+    @JsonIgnore
     public Preference[] getAllocatedPreferences() {
         return allocatedPreferences;
+    }
+
+    public List<Integer> getAllocatedProgramIds() {
+        List<Integer> ids = new ArrayList<>();
+        for (var p : allocatedPreferences) {
+            if (p != null) ids.add(p.getProgramId());
+            else ids.add(null);
+        }
+        return ids;
     }
 
     public boolean[] getPresent() {
@@ -260,9 +279,15 @@ public class Participant {
         return ret + "]";
     }
 
+    @JsonIgnore
     public List<Preference> getOriginalPreferences() {
         return originalPreferences;
     }
+
+    public List<Integer> getOriginalPreferenceIds() {
+        return originalPreferences.stream().map(p -> p.getProgramId()).collect(Collectors.toList());
+    }
+
 
     @Override
     public boolean equals(Object o) {
