@@ -23,7 +23,7 @@ public class ResultExporter {
             dir.mkdir();
         }
 
-        String currentDateInISOFormat = java.time.LocalDateTime.now().toString();
+        String currentDateInISOFormat = java.time.LocalDateTime.now().toString().replace(":", "_").replace(".", "_");
 
         // Create directory for this problem
         String problemDir = "results/result_ua-" + problem.getUnallocated().size() + "_cancel-" + problem.getProgramsWithTooFewParticipants().size() + "_fit-" + problem.calculateFitness() + "_t-" + currentDateInISOFormat;
@@ -46,7 +46,7 @@ public class ResultExporter {
         try {
             File sqlFile = new File(problemDir + "/participant_registrations.sql");
             PrintStream ps = new PrintStream(sqlFile);
-            ps.println("INSERT INTO participant_registration (participant_id, program_id,slot) VALUES");
+            ps.println("INSERT INTO participant_registration (program_id,participant_id,slot) VALUES");
             boolean first = true;
             for (var prg : problem.getPrograms()) {
                 for (int slot =0; slot<prg.getAllocatedTimeSlots().length; slot++) {
@@ -57,7 +57,7 @@ public class ResultExporter {
                             ps.println();
                             ps.print(",");
                         }
-                        ps.print("(" + prg.getId() + "," + part.getId() + "," + slot + ")");
+                        ps.print("(" + prg.getId() + ",'" + part.getId() + "'," + (slot+1) + ")");
                     }
                 }
             }
@@ -156,27 +156,31 @@ public class ResultExporter {
                 var jsonObject = prg.getJSONData();
 
                 // Extract data from JSON object
+                String id = (String) jsonObject.get("id");
+                String name = (String) jsonObject.get("name");
                 String keywords = (String) jsonObject.get("keywords");
                 String author = (String) jsonObject.get("author");
                 String description = (String) jsonObject.get("description");
-                String maxSize = (String) jsonObject.get("maxSize");
-                String roverRecommended = (String) jsonObject.get("roverRecommended");
-                String availableSlots = (String) jsonObject.get("availableSlots");
+                String minSize = prg.getMinPlaces() + "";
+                String maxSize = prg.getMaxPlaces() + "";
+                String roverRecommended = "TRUE".equals(jsonObject.get("roverRecommended")) ? "1" : "0";
+                String availableSlots = prg.getMaxOccurance()+ "";
                 String type = (String) jsonObject.get("type");
                 String countinueInSlot = (String) jsonObject.get("countinueInSlot");
-                String slot3 = (String) jsonObject.get("slot3");
-                String slot2 = (String) jsonObject.get("slot2");
-                String slot1 = (String) jsonObject.get("slot1");
-                String act3 = Boolean.toString(prg.getAllocatedTimeSlots()[2]);
-                String act2 = Boolean.toString(prg.getAllocatedTimeSlots()[1]);
-                String act1 = Boolean.toString(prg.getAllocatedTimeSlots()[0]);
+                String slot3 = "TRUE".equals(jsonObject.get("slot3")) ? "1" : "0";
+                String slot2 = "TRUE".equals(jsonObject.get("slot2")) ? "1" : "0";
+                String slot1 = "TRUE".equals(jsonObject.get("slot1")) ? "1" : "0";
+                String act3 = prg.getAllocatedTimeSlots()[2] ? "1" : "0";
+                String act2 = prg.getAllocatedTimeSlots()[1] ? "1" : "0";
+                String act1 = prg.getAllocatedTimeSlots()[0] ? "1" : "0";
 
-                String name = (String) jsonObject.get("name");
-                String minSize = (String) jsonObject.get("minSize");
-                String id = (String) jsonObject.get("id");
+                if (author!=null) author = author.replace("'", "\\'");
+                if (name!=null) name = name.replace("'", "\\'");
+                if (keywords!=null) keywords = keywords.replace("'", "\\'");
+                if (description!=null) description = description.replace("'", "\\'");
 
                 // Generate the SQL INSERT statement
-                String insertQuery = String.format("INSERT INTO PROGRAM (keywords, author, description, maxSize, roverRecommended, " +
+                String insertQuery = String.format("INSERT INTO program (keywords, author, description, maxSize, roverRecommended, " +
                                 "availableSlots, type, countinueInSlot, slot3, slot2, slot1, act3, act2, act1, name, minSize, id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');\n",
                         keywords, author, description, maxSize, roverRecommended, availableSlots, type, countinueInSlot,
                         slot3, slot2, slot1, act3,act2,act1, name, minSize, id);
