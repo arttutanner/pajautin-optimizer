@@ -2,12 +2,17 @@ package fi.partio.pajautin.optimizer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.partio.pajautin.optimizer.member.Problem;
+import fi.partio.pajautin.optimizer.member.Program;
 import netscape.javascript.JSObject;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.stream.Collectors;
+
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 
 public class ResultExporter {
 
@@ -18,8 +23,10 @@ public class ResultExporter {
             dir.mkdir();
         }
 
+        String currentDateInISOFormat = java.time.LocalDateTime.now().toString();
+
         // Create directory for this problem
-        String problemDir = "results/result_ua-"+problem.getUnallocated().size()+"_cancel-"+problem.getProgramsWithTooFewParticipants().size()+"_fit-"+problem.calculateFitness() +"_t-"+ System.currentTimeMillis();
+        String problemDir = "results/result_ua-" + problem.getUnallocated().size() + "_cancel-" + problem.getProgramsWithTooFewParticipants().size() + "_fit-" + problem.calculateFitness() + "_t-" + currentDateInISOFormat;
         dir = new File(problemDir);
         dir.mkdir();
 
@@ -28,7 +35,37 @@ public class ResultExporter {
         writeProgramsAsJson(problem, problemDir);
         writeParticipantsAsCSV(problem, problemDir);
         writeProgramsAsCSV(problem, problemDir);
+        writeProgramAsSQL(problem, problemDir);
+        writeParticipantRegistrationsAsSQL(problem, problemDir);
 
+
+    }
+
+    private static void writeParticipantRegistrationsAsSQL(Problem problem, String problemDir) {
+
+        try {
+            File sqlFile = new File(problemDir + "/participant_registrations.sql");
+            PrintStream ps = new PrintStream(sqlFile);
+            ps.println("INSERT INTO participant_registration (participant_id, program_id,slot) VALUES");
+            boolean first = true;
+            for (var prg : problem.getPrograms()) {
+                for (int slot =0; slot<prg.getAllocatedTimeSlots().length; slot++) {
+                    for (var part : prg.getAssignedParticipants(slot).values()) {
+                        if (first) {
+                            first = false;
+                        } else {
+                            ps.println();
+                            ps.print(",");
+                        }
+                        ps.print("(" + prg.getId() + "," + part.getId() + "," + slot + ")");
+                    }
+                }
+            }
+            ps.println(";");
+            ps.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
@@ -36,10 +73,10 @@ public class ResultExporter {
         try {
             File csvFile = new File(problemDir + "/programs.csv");
             PrintStream ps = new PrintStream(csvFile);
-            ps.println("id;name;max;min;occurance;possible1;possible2;possible3;active1;active2;active3;participants1;participants2;participants3;");
+            ps.println("id;name;max;min;occurance;possible1;possible2;possible3;active1;active2;active3;participants1;participants2;participants3;empty");
             for (int i = 0; i < problem.getPrograms().size(); i++) {
                 ps.print(problem.getPrograms().get(i).getId() + ";");
-                ps.print(problem.getPrograms().get(i).getName() + ";");
+                ps.print(problem.getPrograms().get(i).getName().replace(';', ' ') + ";");
                 ps.print(problem.getPrograms().get(i).getMaxPlaces() + ";");
                 ps.print(problem.getPrograms().get(i).getMinPlaces() + ";");
                 ps.print(problem.getPrograms().get(i).getMaxOccurance() + ";");
@@ -52,10 +89,10 @@ public class ResultExporter {
                 ps.print(problem.getPrograms().get(i).getAssignedParticipants().get(0).size() + ";");
                 ps.print(problem.getPrograms().get(i).getAssignedParticipants().get(1).size() + ";");
                 ps.print(problem.getPrograms().get(i).getAssignedParticipants().get(2).size() + ";");
+                ps.print((problem.getPrograms().get(i).getAssignedParticipants().stream().map(a -> a.size()).collect(Collectors.summingInt(s -> s)).intValue()==0 ? "TRUE" : "") + ";");
                 ps.println();
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
@@ -66,27 +103,26 @@ public class ResultExporter {
             File csvFile = new File(problemDir + "/participants.csv");
             PrintStream ps = new PrintStream(csvFile);
 
-            ps.println("id;fitness;slot1;slot2;slot3;present1;present2;present3;fitness1;fitness2;fitness3;preferences;");
+            ps.println("id;fitness;slot1;slot2;slot3;present1;present2;present3;fitness1;fitness2;fitness3;best;preferences;");
             for (int i = 0; i < problem.getParticipants().size(); i++) {
                 ps.print(problem.getParticipants().get(i).getId() + ";");
                 ps.print(problem.getParticipants().get(i).getFitness() + ";");
-                ps.print(problem.getParticipants().get(i).getAllocatedProgramIds().get(0)+ ";");
-                ps.print(problem.getParticipants().get(i).getAllocatedProgramIds().get(1)+ ";");
-                ps.print(problem.getParticipants().get(i).getAllocatedProgramIds().get(2)+ ";");
+                ps.print(problem.getParticipants().get(i).getAllocatedProgramIds().get(0) + ";");
+                ps.print(problem.getParticipants().get(i).getAllocatedProgramIds().get(1) + ";");
+                ps.print(problem.getParticipants().get(i).getAllocatedProgramIds().get(2) + ";");
                 ps.print(problem.getParticipants().get(i).getPresent()[0] + ";");
-                ps.print(problem.getParticipants().get(i).getPresent()[1]+ ";");
+                ps.print(problem.getParticipants().get(i).getPresent()[1] + ";");
                 ps.print(problem.getParticipants().get(i).getPresent()[2] + ";");
-                ps.print(problem.getParticipants().get(i).getAllocatedPreferences()[0]==null ? "" :  problem.getParticipants().get(i).getAllocatedPreferences()[0].getOrder() + ";");
-                ps.print(problem.getParticipants().get(i).getAllocatedPreferences()[1]==null ? "" :  problem.getParticipants().get(i).getAllocatedPreferences()[1].getOrder() + ";");
-                ps.print(problem.getParticipants().get(i).getAllocatedPreferences()[2]==null ? "" :  problem.getParticipants().get(i).getAllocatedPreferences()[2].getOrder() + ";");
-
-                ps.print(problem.getParticipants().get(i).getOriginalPreferences().stream().map(p -> p.getProgram().getId()+"").collect(Collectors.joining(";")));
+                ps.print(problem.getParticipants().get(i).getAllocatedPreferences()[0] == null ? ";" : problem.getParticipants().get(i).getAllocatedPreferences()[0].getOrder() + ";");
+                ps.print(problem.getParticipants().get(i).getAllocatedPreferences()[1] == null ? ";" : problem.getParticipants().get(i).getAllocatedPreferences()[1].getOrder() + ";");
+                ps.print(problem.getParticipants().get(i).getAllocatedPreferences()[2] == null ? ";" : problem.getParticipants().get(i).getAllocatedPreferences()[2].getOrder() + ";");
+                ps.print(problem.getParticipants().get(i).getBestPreference() + ";");
+                ps.print(problem.getParticipants().get(i).getOriginalPreferences().stream().map(p -> p.getProgram().getId() + "").collect(Collectors.joining(";")));
                 ps.println();
             }
             ps.close();
 
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
@@ -103,6 +139,59 @@ public class ResultExporter {
         }
 
     }
+
+
+    public static void writeProgramAsSQL(Problem problem, String problemDir) {
+
+        try {
+
+            File sqlFilePath = new File(problemDir + "/programs.sql");
+            // Create the SQL file
+            FileWriter writer = new FileWriter(sqlFilePath);
+
+
+
+            // Iterate over JSON array
+            for (Program prg : problem.getPrograms()) {
+                var jsonObject = prg.getJSONData();
+
+                // Extract data from JSON object
+                String keywords = (String) jsonObject.get("keywords");
+                String author = (String) jsonObject.get("author");
+                String description = (String) jsonObject.get("description");
+                String maxSize = (String) jsonObject.get("maxSize");
+                String roverRecommended = (String) jsonObject.get("roverRecommended");
+                String availableSlots = (String) jsonObject.get("availableSlots");
+                String type = (String) jsonObject.get("type");
+                String countinueInSlot = (String) jsonObject.get("countinueInSlot");
+                String slot3 = (String) jsonObject.get("slot3");
+                String slot2 = (String) jsonObject.get("slot2");
+                String slot1 = (String) jsonObject.get("slot1");
+                String act3 = Boolean.toString(prg.getAllocatedTimeSlots()[2]);
+                String act2 = Boolean.toString(prg.getAllocatedTimeSlots()[1]);
+                String act1 = Boolean.toString(prg.getAllocatedTimeSlots()[0]);
+
+                String name = (String) jsonObject.get("name");
+                String minSize = (String) jsonObject.get("minSize");
+                String id = (String) jsonObject.get("id");
+
+                // Generate the SQL INSERT statement
+                String insertQuery = String.format("INSERT INTO PROGRAM (keywords, author, description, maxSize, roverRecommended, " +
+                                "availableSlots, type, countinueInSlot, slot3, slot2, slot1, act3, act2, act1, name, minSize, id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');\n",
+                        keywords, author, description, maxSize, roverRecommended, availableSlots, type, countinueInSlot,
+                        slot3, slot2, slot1, act3,act2,act1, name, minSize, id);
+
+                // Write the SQL INSERT statement to the file
+                writer.write(insertQuery);
+            }
+
+            // Close the file writer
+            writer.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
 
     private static void writeParticipantsAsJson(Problem problem, String problemDir) {
         ObjectMapper mapper = new ObjectMapper();

@@ -83,12 +83,82 @@ public class Participant {
         }
 
          */
-        
-        if (assingMultiplePreferencesSmartly()) return true;
+        Preference pref = preferences.peek();
+        ArrayList<Integer> possibleSlots = new ArrayList<>();
+        for (int i=0; i<present.length; i++) {
+            if (present[i] && allocatedPreferences[i]==null && pref.getProgram().hasSpace(i) && pref.getProgram().getAllocatedTimeSlots()[i]) {
+                possibleSlots.add(i);
+            }
+        }
+        if (assingMultiplePreferencesSmartly(possibleSlots,pref.getProgram())) return true;
+
+        // Something went wonky, try to assign to any slot
+        log.warn("Could not assign participant "+id+" to any of the preferred slots, trying to assign to any slot.");
+        for (int i=0; i<present.length; i++) {
+            if (present[i]) {
+                if (assignFirstPreference(i)) return true;
+            }
+        }
 
         // remove hopelessly unassignable preference
         preferences.pop();
         return false;
+    }
+
+
+
+    private boolean assingMultiplePreferencesSmartly(ArrayList<Integer> possibleSlots, Program program) {
+
+        if (possibleSlots.size()==0) return false;
+        // Easy case, only one possible slot
+        if (possibleSlots.size()==1) return assignFirstPreference(possibleSlots.get(0));
+
+        // If all of the slots are above minimum, assign to the one with least participants
+        if (possibleSlots.stream().allMatch(slot -> program.getParticipantsInSlot(slot)>=program.getMinPlaces())) {
+            int min = Integer.MAX_VALUE;
+            int minSlot = -1;
+            for (int slot : possibleSlots) {
+                if (program.getParticipantsInSlot(slot) < min) {
+                    min=program.getParticipantsInSlot(slot);
+                    minSlot=slot;
+                }
+            }
+            return assignFirstPreference(minSlot);
+        }
+
+        // if none of the slots are above minimum, assign to the one with most participants to fill at least one up
+        if (possibleSlots.stream().allMatch(slot -> program.getParticipantsInSlot(slot)<program.getMinPlaces())) {
+            int max = 0;
+            int maxSlot = -1;
+            for (int slot : possibleSlots) {
+                if (program.getParticipantsInSlot(slot) >= max) {
+                    max = program.getParticipantsInSlot(slot);
+                    maxSlot = slot;
+                }
+            }
+            return assignFirstPreference(maxSlot);
+        }
+
+        // See the next preference and assign to slot that does not interfere with it
+        if (preferences.size()>2) {
+            var nextPref = preferences.get(preferences.size()-2);
+
+            for (int i=0; i<present.length; i++) {
+                if (present[i] && allocatedPreferences[i]==null && nextPref.getProgram().hasSpace(i) && nextPref.getProgram().getAllocatedTimeSlots()[i]) {
+                    // If there is more than one possible slots and the next preference can be assigned to one of them
+                    // remove that slot from the possible slots
+                    if (possibleSlots.size()>1) {
+                        int finalI = i;
+                        possibleSlots.removeIf(slot -> slot == finalI);
+                    }
+                }
+            }
+        }
+
+        // Pick a random slot from the remaining possible ones
+        int slot = possibleSlots.get(new Random().nextInt(possibleSlots.size()));
+        return assignFirstPreference(slot);
+
     }
 
     public boolean assignFirstPreference(int timeSlot) {
@@ -123,10 +193,27 @@ public class Participant {
             return false;
         }
 
-        program.assignParticipant(this,timeSlot);
+
+
+        // If the program has countinueToSlot set, assign the participant to the next slot as well
+        if (program.getCountinueOnSlot()!=null) {
+            int cntSlot = program.getCountinueOnSlot()-1;
+            if (!present[cntSlot]) {
+                log.warn("Could not assign participant "+id+" to COUNTINUATION OF program with id "+program.getId()+" in timeslot "+cntSlot+ " because participant is not present.");
+                return false;
+            }
+            // Create a preference that does not exist
+            Program dummyPrg = new Program(program.getId()+1000,"Jatkuu: "+program.getName());
+            Preference dummyPref = new Preference(dummyPrg,pref.order);
+            if (getAllocatedPreferences()[cntSlot]!=null) {
+                unAssignSlot(cntSlot);
+            }
+            allocatedPreferences[cntSlot]=dummyPref;
+
+        }
 
         allocatedPreferences[timeSlot]=pref;
-
+        program.assignParticipant(this,timeSlot);
         log.debug("Assigned participant "+id+" to program with id "+program.getId()+" on slot "+(timeSlot+1));
         return true;
     }
@@ -288,6 +375,15 @@ public class Participant {
         return originalPreferences.stream().map(p -> p.getProgramId()).collect(Collectors.toList());
     }
 
+    public int getBestPreference() {
+        int best = 999;
+        for (var p : allocatedPreferences) {
+            if (p != null) {
+                if (p.getOrder() < best) best = p.getOrder();
+            }
+        }
+        return best;
+    }
 
     @Override
     public boolean equals(Object o) {

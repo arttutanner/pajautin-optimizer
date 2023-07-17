@@ -3,6 +3,7 @@ package fi.partio.pajautin.optimizer.member;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -10,8 +11,13 @@ public class Program {
 
     private static final Logger log = LogManager.getLogger(Program.class);
 
+    private Integer countinueOnSlot;
 
     public int MAX_SCORE = 30;
+
+    private boolean isDummy;
+
+    private Map<Object,Object> JSONData;
 
     String name;
     int id;
@@ -48,7 +54,11 @@ public class Program {
 
     HashMap<String, Participant>[] assignedParticipants;
 
-
+    public Program (int id, String name) {
+        this.id = id;
+        this.name = name;
+        this.isDummy = true;
+    }
 
     public Program(Map<Object, Object> JSONData) {
         this.name = JSONData.get("name") + "";
@@ -61,6 +71,9 @@ public class Program {
         this.minPlaces = safeParseInt(JSONData.get("minSize"), 5);
         this.maxOccurance = safeParseInt(JSONData.get("availableSlots"), 1);
         this.id = Integer.parseInt(JSONData.get("id") + "");
+        if (JSONData.containsKey("countinueInSlot") && !JSONData.get("countinueInSlot").equals(""))
+            this.countinueOnSlot = Integer.parseInt(JSONData.get("countinueInSlot") + "");
+        this.JSONData = JSONData;
 
         possibleTimeSlotCount = 0;
         for (boolean b : possibleTimeSlots)
@@ -167,7 +180,29 @@ public class Program {
                 mostPopularCount = slotPreference[i];
             }
         }
-        if (mostPopularCount==0) return -1;
+        if (mostPopularCount==0) {
+            if (getAllocatedTimeSlotCount()==0) {
+                // if no timeslots have been allocated yet, allocate one timeslot at random
+                ArrayList<Integer> possibleSlots = new ArrayList<>();
+                for (int i = 0; i < possibleTimeSlots.length; i++) {
+                    if (hasSpace(i) && possibleTimeSlots[i] && !allocatedTimeSlots[i]) {
+                        possibleSlots.add(i);
+                    }
+                }
+                if (possibleSlots.size()>0) {
+                    mostPopularSlot = possibleSlots.get((int) (Math.random() * possibleSlots.size()));
+                }
+                else {
+                    log.info("No more slots available for program with id " + id);
+                    mostPopularSlot = -1;
+                }
+            }
+            else {
+                // if unpopular program has already been allocated to one timeslot, it is enough
+                mostPopularSlot = -1;
+            }
+
+        }
         return mostPopularSlot;
     }
 
@@ -227,7 +262,10 @@ public class Program {
         return count;
     }
 
-
+    public int getParticipantsInSlot(int slot) {
+        if (assignedParticipants[slot]==null) return 0;
+        return assignedParticipants[slot].size();
+    }
 
     public int getMinPlaces() {
         return minPlaces;
@@ -339,6 +377,20 @@ public class Program {
         return facilitators.stream().map(f -> f.getId()).collect(Collectors.toList());
     }
 
+    public Integer getCountinueOnSlot() {
+        return countinueOnSlot;
+    }
+
+    public boolean isDummy() {
+        return isDummy;
+    }
 
 
+    public Map<Object, Object> getJSONData() {
+        return JSONData;
+    }
+
+    public void setJSONData(Map<Object, Object> JSONData) {
+        this.JSONData = JSONData;
+    }
 }

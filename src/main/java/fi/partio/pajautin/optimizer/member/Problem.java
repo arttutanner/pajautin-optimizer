@@ -110,7 +110,20 @@ public class Problem {
         stats.put("Total Fitness", calculateFitness());
         stats.put("Average Fitness", (float)calculateFitness()/(float)participants.size());
         stats.put("Total allocated / unalllocated slots", (participants.stream().mapToInt(p -> p.getAllocatedCount()).sum())+ " / " + (participants.stream().mapToInt(p -> p.getUnallocatedCount()).sum()));
+        stats.put("At least one among 3 %", getBestPrefAmong(3));
+        stats.put("Got top pref %", getBestPrefAmong(1));
         return stats;
+    }
+
+    private float getBestPrefAmong(int among) {
+        float found =0;
+        float tot=0;
+        for (Participant  p : participants.stream().filter(p -> p.getOriginalPreferences().size()>9).collect(Collectors.toList())) {
+            if (p.getBestPreference() <= among) found++;
+
+            tot++;
+        }
+        return found/tot*100;
     }
 
     @JsonIgnore
@@ -131,6 +144,7 @@ public class Problem {
             System.out.println(key + ": " + stats.get(key));
         }
     }
+
 
 
     public ArrayList<Participant> getParticipants() {

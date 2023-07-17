@@ -4,13 +4,7 @@ import fi.partio.pajautin.optimizer.engine.EagerOptimizer;
 import fi.partio.pajautin.optimizer.engine.Optimizer;
 import fi.partio.pajautin.optimizer.engine.SanityChecker;
 import fi.partio.pajautin.optimizer.member.Problem;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.core.config.Configurator;
-import org.apache.logging.log4j.core.config.builder.api.AppenderComponentBuilder;
-import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilder;
-import org.apache.logging.log4j.core.config.builder.api.ConfigurationBuilderFactory;
-import org.apache.logging.log4j.core.config.builder.api.RootLoggerComponentBuilder;
-import org.apache.logging.log4j.core.config.builder.impl.BuiltConfiguration;
+
 
 
 public class Main {
@@ -18,8 +12,10 @@ public class Main {
 
 
         if (args[0].equals("optimize")) {
-          // for (int i=0; i<100; i++)
-                optimize(args);
+
+           for (var done = optimize(args); !done ; done = optimize(args)) {
+               System.out.println("Optimization failed, trying again");
+           }
         } else if (args[0].equals("test-data")) {
             test(args);
         } else if (args[0].equals("csv")) {
@@ -33,7 +29,7 @@ public class Main {
         DataUtil.writeProjectedData(3250);
     }
 
-    private static void optimize(String[] args) {
+    private static boolean optimize(String[] args) {
         Problem problem = new Problem(DataUtil.readJsonFileToList(args[1]),DataUtil.readJsonFileToMap(args[2]), DataUtil.readJsonFileToDoubleList(args[3]));
         Optimizer optimizer = new EagerOptimizer(problem);
         optimizer.optimize();
@@ -42,8 +38,10 @@ public class Main {
         if (SanityChecker.checkSanity(problem)) {
             System.out.println("Sanity check passed");
             ResultExporter.exportProblem(problem);
+            return true;
         } else {
             System.out.println("Sanity check failed");
+            return false;
         }
 
 

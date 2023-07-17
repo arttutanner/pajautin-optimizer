@@ -32,8 +32,7 @@ public class EagerOptimizer extends Optimizer {
         // Resolve trivial cases until there are no more
         for (int i = resolveTrivialCases(); i > 0; i = resolveTrivialCases()) {
             log.info("Resolved " + i + " trivial cases");
-            problem.printStats();
-            System.out.println("-----------------------------------");
+
         }
 
 
@@ -44,8 +43,7 @@ public class EagerOptimizer extends Optimizer {
         // Resolve non-trivial but timeslot-fixed cases until there are no more
         for (int i = resolveNonTrivialFixedCases(); i > 0; i = resolveNonTrivialFixedCases()) {
             log.info("Resolved " + i + " non-trivial fixed cases");
-            problem.printStats();
-            System.out.println("-----------------------------------");
+
         }
 
         pruneResolvedParticipants();
@@ -68,7 +66,9 @@ public class EagerOptimizer extends Optimizer {
             pruneResolvedParticipants();
             pruneResolvedPrograms();
         }
-        //System.out.println("Iterations: " + i);
+        if (i == 10000) {
+            log.error("Reached maximum number of iterations. Probably stuck in a loop.");
+        }
 
 
         tryToAllocateUnallocatedParticipants();

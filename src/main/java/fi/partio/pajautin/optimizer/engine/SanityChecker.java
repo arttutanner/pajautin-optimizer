@@ -9,6 +9,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class SanityChecker {
 
@@ -26,10 +28,13 @@ public class SanityChecker {
         return allProgramsFromThePreferences(problem) &&
                 noDuplicatePrograms(problem) &&
                 noProgramsWhileNotPresent(problem) &&
-                noProgramAllocationWithProgramNotActive(problem);
+                noProgramAllocationWithProgramNotActive(problem) &&
+                noUnallocatedParticipants(problem);
 
 
     }
+
+
 
     public static boolean checkProgramsParametersFulfilled(Problem problem) {
         return noActiveMoreThanMaxOccurances(problem) &&
@@ -41,10 +46,21 @@ public class SanityChecker {
 
     }
 
+
+    private static boolean noUnallocatedParticipants(Problem problem) {
+        Optional<Participant> unallocated = problem.getParticipants().stream().filter(p -> p.getAllocatedCount() < p.getPresentCount() && p.getOriginalPreferences().size() > 9).findFirst();
+        if (unallocated.isPresent()) {
+            log.error("Participant " + unallocated.get().getId() + " has not been allocated to enough programs");
+            return false;
+        }
+        log.info("No unallocated participants");
+        return true;
+    }
+
     public static boolean crossCheckProgramAndParticipant(Problem problem) {
         for (Participant p : problem.getParticipants()) {
             for (int i = 0; i < p.getAllocatedPreferences().length; i++) {
-                if (p.getAllocatedPreferences()[i] != null) {
+                if (p.getAllocatedPreferences()[i] != null && !p.getAllocatedPreferences()[i].getProgram().isDummy()) {
                     if (!p.getAllocatedPreferences()[i].getProgram().getAssignedParticipants(i).containsKey(p.getId())) {
                         log.error("Participant " + p.getId() + " allocated to program " + p.getAllocatedPreferences()[i].getProgram().getId() + " while not present in the program");
                         return false;
@@ -92,9 +108,9 @@ public class SanityChecker {
             for (int i = 0; i < p.getAllocatedTimeSlots().length; i++) {
                 if (p.getAllocatedTimeSlots()[i]) {
                     if (p.getAssignedParticipants(i).size() < p.getMinPlaces()) {
-                        log.error("Program " + p.getId() + " has too little participants in timeslot " + i);
+                        log.error("Program " + p.getId() + " has too few participants in timeslot " + i);
                         // Let's not stop here, because this is not a fatal error
-                        // return false;
+                        return false;
                     }
                 }
             }
@@ -139,7 +155,7 @@ public class SanityChecker {
     private static boolean noProgramAllocationWithProgramNotActive(Problem problem) {
         for (Participant p : problem.getParticipants()) {
             for (int i = 0; i < p.getAllocatedPreferences().length; i++) {
-                if (p.getAllocatedPreferences()[i] != null) {
+                if (p.getAllocatedPreferences()[i] != null && !p.getAllocatedPreferences()[i].getProgram().isDummy()) {
                     if (!p.getAllocatedPreferences()[i].getProgram().getAllocatedTimeSlots()[i]) {
                         log.error("Program " + p.getAllocatedPreferences()[i].getProgram().getId() + " allocated to participant " + p.getId() + " while not active in the timeslot " + i);
                         return false;
@@ -188,7 +204,7 @@ public class SanityChecker {
     private static boolean allProgramsFromThePreferences(Problem problem) {
         for (Participant p : problem.getParticipants()) {
             for (int i = 0; i < p.getAllocatedPreferences().length; i++) {
-                if (p.getAllocatedPreferences()[i] != null) {
+                if (p.getAllocatedPreferences()[i] != null && !p.getAllocatedPreferences()[i].getProgram().isDummy()) {
                     boolean found = false;
                     for (int j = 0; j < p.getOriginalPreferences().size(); j++) {
                         if (p.getAllocatedPreferences()[i].getProgram().getId() == p.getOriginalPreferences().get(j).getProgram().getId()) {
@@ -217,8 +233,6 @@ public class SanityChecker {
                                 log.error("Facilitator " + facilitatorId + " allocated to program " + facilitator.getAllocatedProgramIds().get(i) + " during own workshop");
                                 return false;
                         }
-                        log.error("Workshop " + p.getId() + " has no speakers in timeslot " + i);
-                        return false;
                     }
                 }
             }
